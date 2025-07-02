@@ -3,101 +3,283 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>주식 차트 조회</title>
+    <title>📈 StockInsight - 주식 차트 조회</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #1a73e8;
+            --primary-variant: #1557b0;
+            --secondary-color: #34a853;
+            --background: #f8f9fa;
+            --surface: #ffffff;
+            --surface-variant: #f1f3f4;
+            --on-surface: #202124;
+            --on-surface-variant: #5f6368;
+            --outline: #e8eaed;
+            --shadow: rgba(60, 64, 67, 0.15);
+            --success: #137333;
+            --error: #d93025;
+            --warning: #f9ab00;
+            --border-radius: 12px;
+            --elevation-1: 0 1px 2px 0 rgba(60, 64, 67, 0.30), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+            --elevation-2: 0 1px 2px 0 rgba(60, 64, 67, 0.30), 0 2px 6px 2px rgba(60, 64, 67, 0.15);
+            --elevation-3: 0 4px 8px 3px rgba(60, 64, 67, 0.15), 0 1px 3px rgba(60, 64, 67, 0.30);
+            --transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e8f0fe 100%);
+            color: var(--on-surface);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            max-width: 1440px;
             margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
+            padding: 24px;
         }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
+
+        .header {
             text-align: center;
-            color: #333;
-            margin-bottom: 30px;
+            margin-bottom: 48px;
         }
-        .input-section {
-            text-align: center;
-            margin-bottom: 30px;
+
+        .app-title {
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0 0 8px 0;
         }
-        input[type="text"] {
-            padding: 12px;
+
+        .app-subtitle {
+            font-size: 1.125rem;
+            color: var(--on-surface-variant);
+            font-weight: 400;
+            margin: 0;
+        }
+        .search-card {
+            background: var(--surface);
+            border-radius: var(--border-radius);
+            padding: 32px;
+            margin-bottom: 32px;
+            box-shadow: var(--elevation-1);
+            transition: var(--transition);
+        }
+
+        .search-card:hover {
+            box-shadow: var(--elevation-2);
+        }
+
+        .search-form {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .input-group {
+            position: relative;
+            flex: 1;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 16px 20px;
             font-size: 16px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            width: 200px;
-            margin-right: 10px;
+            border: 2px solid var(--outline);
+            border-radius: var(--border-radius);
+            background: var(--surface);
+            color: var(--on-surface);
+            transition: var(--transition);
+            font-family: inherit;
         }
-        button {
-            padding: 12px 20px;
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.12);
+        }
+
+        .input-field::placeholder {
+            color: var(--on-surface-variant);
+        }
+
+        .btn-primary {
+            padding: 16px 32px;
             font-size: 16px;
-            background-color: #007bff;
+            font-weight: 500;
+            background: var(--primary-color);
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: var(--border-radius);
             cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
         }
-        button:hover {
-            background-color: #0056b3;
+
+        .btn-primary:hover {
+            background: var(--primary-variant);
+            box-shadow: var(--elevation-2);
         }
-        .charts-container {
+
+        .btn-primary:active {
+            transform: translateY(1px);
+        }
+
+        .btn-primary:disabled {
+            background: var(--outline);
+            color: var(--on-surface-variant);
+            cursor: not-allowed;
+        }
+        .main-content {
             display: grid;
-            grid-template-columns: 1fr;
-            gap: 30px;
-            margin-top: 30px;
+            gap: 32px;
         }
-        .chart-container {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+
+        .chart-card {
+            background: var(--surface);
+            border-radius: var(--border-radius);
+            padding: 24px;
+            box-shadow: var(--elevation-1);
+            transition: var(--transition);
         }
+
+        .chart-card:hover {
+            box-shadow: var(--elevation-2);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
         .chart-title {
-            text-align: center;
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #333;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--on-surface);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        .loading {
-            text-align: center;
-            color: #666;
-            margin: 20px 0;
+
+        .chart-canvas {
+            position: relative;
+            height: 400px;
+            width: 100%;
         }
-        .error {
-            color: #d32f2f;
+        .status-message {
             text-align: center;
-            margin: 20px 0;
-            padding: 10px;
-            background-color: #ffebee;
-            border-radius: 5px;
+            padding: 16px 24px;
+            border-radius: var(--border-radius);
+            margin: 16px 0;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
         }
+
+        .status-loading {
+            background: rgba(26, 115, 232, 0.1);
+            color: var(--primary-color);
+            border: 1px solid rgba(26, 115, 232, 0.2);
+        }
+
+        .status-analyzing {
+            background: rgba(52, 168, 83, 0.1);
+            color: var(--secondary-color);
+            border: 1px solid rgba(52, 168, 83, 0.2);
+        }
+
+        .status-error {
+            background: rgba(217, 48, 37, 0.1);
+            color: var(--error);
+            border: 1px solid rgba(217, 48, 37, 0.2);
+        }
+
         .stock-info {
+            background: var(--surface-variant);
+            padding: 16px 24px;
+            border-radius: var(--border-radius);
             text-align: center;
-            margin: 20px 0;
-            font-size: 18px;
-            color: #333;
+            font-size: 1.125rem;
+            font-weight: 500;
+            color: var(--on-surface);
+            margin: 16px 0;
         }
-        .prediction-section, .analysis-section {
-            background: white;
-            padding: 25px;
-            margin: 20px 0;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
-        .prediction-section h2, .analysis-section h2 {
-            margin-top: 0;
-            color: #333;
-            border-bottom: 2px solid #007bff;
-            padding-bottom: 10px;
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .insights-grid {
+            display: grid;
+            gap: 24px;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        }
+
+        .insight-card {
+            background: var(--surface);
+            border-radius: var(--border-radius);
+            padding: 24px;
+            box-shadow: var(--elevation-1);
+            transition: var(--transition);
+        }
+
+        .insight-card:hover {
+            box-shadow: var(--elevation-2);
+        }
+
+        .insight-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--outline);
+        }
+
+        .insight-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--on-surface);
+            margin: 0;
+        }
+
+        .insight-icon {
+            width: 24px;
+            height: 24px;
+            color: var(--primary-color);
         }
         .prediction-card {
             display: grid;
@@ -196,80 +378,201 @@
         }
         .period-selector {
             display: flex;
-            gap: 5px;
+            gap: 8px;
+            align-items: center;
         }
+
         .period-select {
-            padding: 8px 15px;
-            border: 1px solid #ddd;
-            background: white;
-            border-radius: 5px;
+            padding: 12px 16px;
+            border: 1px solid var(--outline);
+            background: var(--surface);
+            border-radius: var(--border-radius);
             cursor: pointer;
             font-size: 14px;
-            min-width: 100px;
+            font-weight: 500;
+            color: var(--on-surface);
+            transition: var(--transition);
+            min-width: 120px;
         }
+
         .period-select:focus {
             outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.12);
+        }
+
+        .period-select:hover {
+            border-color: var(--primary-color);
+        }
+
+        @media (max-width: 768px) {
+            .app-container {
+                padding: 16px;
+            }
+
+            .search-card {
+                padding: 24px;
+            }
+
+            .search-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .chart-header {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+
+            .insights-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-title {
+                font-size: 1.25rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .app-title {
+                font-size: 2rem;
+            }
+
+            .insight-card {
+                padding: 16px;
+            }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .slide-up {
+            animation: slideUp 0.4s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>📈 주식 차트 조회</h1>
+    <div class="app-container">
+        <header class="header">
+            <h1 class="app-title">📈 StockInsight</h1>
+            <p class="app-subtitle">AI 기반 스마트 주식 분석 플랫폼</p>
+        </header>
         
-        <div class="input-section">
-            <input type="text" id="stockCodeInput" placeholder="주식 코드 입력 (예: 005930)" />
-            <button onclick="fetchStockData()">조회</button>
+        <div class="search-card">
+            <form class="search-form" onsubmit="return false;">
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        id="stockCodeInput" 
+                        class="input-field"
+                        placeholder="주식 코드를 입력하세요 (예: 005930, 000660)"
+                        autocomplete="off"
+                    />
+                </div>
+                <button type="button" class="btn-primary" onclick="fetchStockData()" id="searchBtn">
+                    <span class="material-icons">search</span>
+                    조회하기
+                </button>
+            </form>
         </div>
         
         <div id="stockInfo" class="stock-info" style="display: none;"></div>
-        <div id="loading" class="loading" style="display: none;">데이터를 불러오는 중...</div>
-        <div id="analyzing" class="loading" style="display: none;">📊 AI 분석 중...</div>
-        <div id="error" class="error" style="display: none;"></div>
+        <div id="loading" class="status-message status-loading" style="display: none;">
+            <span class="spinner"></span>
+            데이터를 불러오는 중입니다...
+        </div>
+        <div id="analyzing" class="status-message status-analyzing" style="display: none;">
+            <span class="material-icons">analytics</span>
+            AI가 차트를 분석하고 있습니다...
+        </div>
+        <div id="error" class="status-message status-error" style="display: none;"></div>
         
-        <!-- 통합 차트 -->
-        <div class="charts-container">
-            <div class="chart-container">
+        <main class="main-content">
+            <!-- 차트 카드 -->
+            <div class="chart-card" id="chartCard" style="display: none;">
                 <div class="chart-header">
-                    <div class="chart-title">주가 및 거래량 차트</div>
+                    <h2 class="chart-title">
+                        <span class="material-icons insight-icon">trending_up</span>
+                        주가 및 거래량 차트
+                    </h2>
                     <div class="period-selector">
+                        <label for="periodSelect" style="font-weight: 500; color: var(--on-surface-variant); margin-right: 8px;">기간:</label>
                         <select id="periodSelect" class="period-select">
                             <option value="1w">1주일</option>
                             <option value="1m" selected>1개월</option>
                             <option value="3m">3개월</option>
                             <option value="1y">1년</option>
-                            <option value="max">전체</option>
+                            <option value="max">전체 기간</option>
                         </select>
                     </div>
                 </div>
-                <canvas id="combinedChart"></canvas>
+                <div class="chart-canvas">
+                    <canvas id="combinedChart"></canvas>
+                </div>
             </div>
-        </div>
-        
-        <!-- 예측 섹션 -->
-        <div id="predictionSection" class="prediction-section" style="display: none;">
-            <h2>🔮 주가 예측</h2>
-            <div id="predictionContent"></div>
-        </div>
-        
-        <!-- 분석 섹션 -->
-        <div id="analysisSection" class="analysis-section" style="display: none;">
-            <h2>📊 차트 분석</h2>
-            <div id="analysisContent"></div>
-        </div>
-        
-        <!-- 상세 예측 섹션 -->
-        <div id="detailedPredictionSection" class="analysis-section" style="display: none;">
-            <h2>🔮 상세 예측 분석</h2>
-            <div id="detailedPredictionContent"></div>
-        </div>
-        
-        <!-- 상세 분석 섹션 -->
-        <div id="detailedAnalysisSection" class="analysis-section" style="display: none;">
-            <h2>📈 상세 차트 분석</h2>
-            <div id="detailedAnalysisContent"></div>
-        </div>
+            
+            <!-- 인사이트 그리드 -->
+            <div class="insights-grid" id="insightsGrid" style="display: none;">
+                <!-- 예측 카드 -->
+                <div id="predictionSection" class="insight-card" style="display: none;">
+                    <div class="insight-header">
+                        <span class="material-icons insight-icon">psychology</span>
+                        <h3 class="insight-title">AI 주가 예측</h3>
+                    </div>
+                    <div id="predictionContent"></div>
+                </div>
+                
+                <!-- 분석 카드 -->
+                <div id="analysisSection" class="insight-card" style="display: none;">
+                    <div class="insight-header">
+                        <span class="material-icons insight-icon">analytics</span>
+                        <h3 class="insight-title">기술적 분석</h3>
+                    </div>
+                    <div id="analysisContent"></div>
+                </div>
+                
+                <!-- 상세 예측 카드 -->
+                <div id="detailedPredictionSection" class="insight-card" style="display: none;">
+                    <div class="insight-header">
+                        <span class="material-icons insight-icon">insights</span>
+                        <h3 class="insight-title">상세 예측 분석</h3>
+                    </div>
+                    <div id="detailedPredictionContent"></div>
+                </div>
+                
+                <!-- 상세 분석 카드 -->
+                <div id="detailedAnalysisSection" class="insight-card" style="display: none;">
+                    <div class="insight-header">
+                        <span class="material-icons insight-icon">query_stats</span>
+                        <h3 class="insight-title">심화 차트 분석</h3>
+                    </div>
+                    <div id="detailedAnalysisContent"></div>
+                </div>
+            </div>
+        </main>
     </div>
 
     <script>
@@ -298,110 +601,216 @@
         }
 
         function showError(message) {
-            document.getElementById('error').textContent = message;
-            document.getElementById('error').style.display = 'block';
+            const errorEl = document.getElementById('error');
+            errorEl.innerHTML = `<span class="material-icons">error</span>${message}`;
+            errorEl.style.display = 'block';
+            errorEl.classList.add('fade-in');
             document.getElementById('stockInfo').style.display = 'none';
             hideAnalyzing();
         }
 
         function showStockInfo(stockCode) {
-            document.getElementById('stockInfo').textContent = `${stockCode} 주식 데이터`;
-            document.getElementById('stockInfo').style.display = 'block';
+            const stockInfoEl = document.getElementById('stockInfo');
+            stockInfoEl.innerHTML = `<span class="material-icons" style="margin-right: 8px;">trending_up</span>${stockCode} 주식 데이터 로드 완료`;
+            stockInfoEl.style.display = 'block';
+            stockInfoEl.classList.add('fade-in');
+            
+            // 차트 카드 표시
+            const chartCard = document.getElementById('chartCard');
+            chartCard.style.display = 'block';
+            chartCard.classList.add('slide-up');
         }
 
         function displayPrediction(prediction) {
+            const predictionSection = document.getElementById('predictionSection');
             const predictionContent = document.getElementById('predictionContent');
             const directionClass = prediction.direction === '상승' ? 'up' : 'down';
             
+            predictionSection.style.display = 'block';
+            predictionSection.classList.add('fade-in');
+            
             predictionContent.innerHTML = `
-                <div class="prediction-card">
-                    <div class="prediction-item">
-                        <h3>${prediction.target_date} 예측</h3>
-                        <div class="prediction-direction ${directionClass}">
-                            ${prediction.direction === '상승' ? '📈' : '📉'} ${prediction.direction}
+                <div style="display: grid; gap: 16px; margin-bottom: 24px;">
+                    <div style="background: linear-gradient(135deg, ${prediction.direction === '상승' ? 'rgba(52, 168, 83, 0.1)' : 'rgba(234, 67, 53, 0.1)'}, rgba(255, 255, 255, 0.1)); padding: 20px; border-radius: 12px; border: 1px solid ${prediction.direction === '상승' ? 'rgba(52, 168, 83, 0.2)' : 'rgba(234, 67, 53, 0.2)'};">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                            <span style="font-size: 32px;">${prediction.direction === '상승' ? '📈' : '📉'}</span>
+                            <div>
+                                <div style="font-size: 1.5rem; font-weight: 700; color: ${prediction.direction === '상승' ? 'var(--success)' : 'var(--error)'};">
+                                    ${prediction.direction} 예상
+                                </div>
+                                <div style="color: var(--on-surface-variant); font-size: 0.9rem;">
+                                    ${prediction.target_date} • 신뢰도 ${prediction.probability}%
+                                </div>
+                            </div>
                         </div>
-                        <div>확률: ${prediction.probability}%</div>
                     </div>
-                    <div class="prediction-item">
-                        <h3>예상 시가</h3>
-                        <div style="font-size: 20px; font-weight: bold;">${prediction.predicted_prices.open.toLocaleString()}원</div>
-                    </div>
-                    <div class="prediction-item">
-                        <h3>예상 종가</h3>
-                        <div style="font-size: 20px; font-weight: bold;">${prediction.predicted_prices.close.toLocaleString()}원</div>
-                    </div>
-                    <div class="prediction-item">
-                        <h3>예상 최고가</h3>
-                        <div style="font-size: 20px; font-weight: bold;">${prediction.predicted_prices.high.toLocaleString()}원</div>
-                    </div>
-                    <div class="prediction-item">
-                        <h3>예상 최저가</h3>
-                        <div style="font-size: 20px; font-weight: bold;">${prediction.predicted_prices.low.toLocaleString()}원</div>
-                    </div>
-                    <div class="prediction-item">
-                        <h3>예상 거래량</h3>
-                        <div style="font-size: 20px; font-weight: bold;">${prediction.predicted_volume.toLocaleString()}주</div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px;">
+                        <div style="background: var(--surface-variant); padding: 16px; border-radius: 8px; text-align: center;">
+                            <div style="color: var(--on-surface-variant); font-size: 0.875rem; margin-bottom: 4px;">예상 시가</div>
+                            <div style="font-size: 1.25rem; font-weight: 600; color: var(--on-surface);">${prediction.predicted_prices.open.toLocaleString()}원</div>
+                        </div>
+                        <div style="background: var(--surface-variant); padding: 16px; border-radius: 8px; text-align: center;">
+                            <div style="color: var(--on-surface-variant); font-size: 0.875rem; margin-bottom: 4px;">예상 종가</div>
+                            <div style="font-size: 1.25rem; font-weight: 600; color: var(--on-surface);">${prediction.predicted_prices.close.toLocaleString()}원</div>
+                        </div>
+                        <div style="background: var(--surface-variant); padding: 16px; border-radius: 8px; text-align: center;">
+                            <div style="color: var(--on-surface-variant); font-size: 0.875rem; margin-bottom: 4px;">예상 최고가</div>
+                            <div style="font-size: 1.25rem; font-weight: 600; color: var(--success);">${prediction.predicted_prices.high.toLocaleString()}원</div>
+                        </div>
+                        <div style="background: var(--surface-variant); padding: 16px; border-radius: 8px; text-align: center;">
+                            <div style="color: var(--on-surface-variant); font-size: 0.875rem; margin-bottom: 4px;">예상 최저가</div>
+                            <div style="font-size: 1.25rem; font-weight: 600; color: var(--error);">${prediction.predicted_prices.low.toLocaleString()}원</div>
+                        </div>
+                        <div style="background: var(--surface-variant); padding: 16px; border-radius: 8px; text-align: center;">
+                            <div style="color: var(--on-surface-variant); font-size: 0.875rem; margin-bottom: 4px;">예상 거래량</div>
+                            <div style="font-size: 1.25rem; font-weight: 600; color: var(--on-surface);">${prediction.predicted_volume.toLocaleString()}주</div>
+                        </div>
                     </div>
                 </div>
                 ${prediction.reasoning ? `
-                    <div class="reasoning-box">
-                        <h4>🎯 예측 이유</h4>
-                        <p>${prediction.reasoning}</p>
+                    <div style="background: rgba(26, 115, 232, 0.05); border-left: 4px solid var(--primary-color); padding: 16px; border-radius: 0 8px 8px 0; margin-top: 16px;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <span class="material-icons" style="color: var(--primary-color); font-size: 20px;">lightbulb</span>
+                            <strong style="color: var(--primary-color);">AI 예측 근거</strong>
+                        </div>
+                        <p style="margin: 0; line-height: 1.5; color: var(--on-surface);">${prediction.reasoning}</p>
                     </div>
                 ` : ''}
             `;
-            document.getElementById('predictionSection').style.display = 'block';
         }
 
         function displayAnalysis(analysis) {
+            const analysisSection = document.getElementById('analysisSection');
             const analysisContent = document.getElementById('analysisContent');
             
+            analysisSection.style.display = 'block';
+            analysisSection.classList.add('fade-in');
+            
             analysisContent.innerHTML = `
-                <div class="analysis-grid">
-                    <div class="analysis-item">
-                        <h3>💰 현재 주가 정보</h3>
-                        <p><strong>현재가:</strong> ${analysis.current_price.toLocaleString()}원</p>
-                        <p><strong>전일 대비:</strong> ${analysis.price_change > 0 ? '+' : ''}${analysis.price_change.toFixed(0)}원 
-                           (${analysis.price_change_pct > 0 ? '+' : ''}${analysis.price_change_pct.toFixed(2)}%)</p>
+                <div style="display: grid; gap: 20px;">
+                    <!-- 현재 주가 정보 -->
+                    <div style="background: var(--surface-variant); padding: 20px; border-radius: 12px;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                            <span class="material-icons" style="color: var(--primary-color);">monetization_on</span>
+                            <h4 style="margin: 0; font-size: 1.1rem; font-weight: 600;">현재 주가 정보</h4>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                            <div>
+                                <div style="color: var(--on-surface-variant); font-size: 0.875rem;">현재가</div>
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--on-surface);">${analysis.current_price.toLocaleString()}원</div>
+                            </div>
+                            <div>
+                                <div style="color: var(--on-surface-variant); font-size: 0.875rem;">전일 대비</div>
+                                <div style="font-size: 1.25rem; font-weight: 600; color: ${analysis.price_change >= 0 ? 'var(--success)' : 'var(--error)'};">
+                                    ${analysis.price_change > 0 ? '+' : ''}${analysis.price_change.toFixed(0)}원 
+                                    (${analysis.price_change_pct > 0 ? '+' : ''}${analysis.price_change_pct.toFixed(2)}%)
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="analysis-item">
-                        <h3>📈 이동평균선</h3>
-                        <p><strong>5일:</strong> ${analysis.moving_averages.ma5.toLocaleString()}원</p>
-                        <p><strong>20일:</strong> ${analysis.moving_averages.ma20.toLocaleString()}원</p>
-                        <p><strong>60일:</strong> ${analysis.moving_averages.ma60.toLocaleString()}원</p>
-                    </div>
-                    
-                    <div class="analysis-item">
-                        <h3>📊 거래량 분석</h3>
-                        <p><strong>현재 거래량:</strong> ${analysis.volume_analysis.current_volume.toLocaleString()}주</p>
-                        <p><strong>평균 거래량:</strong> ${analysis.volume_analysis.avg_volume.toLocaleString()}주</p>
-                        <p><strong>거래량 비율:</strong> ${analysis.volume_analysis.volume_ratio.toFixed(2)}배</p>
-                    </div>
-                    
-                    <div class="analysis-item">
-                        <h3>🎯 기술적 지표</h3>
-                        <p><strong>RSI:</strong> ${analysis.technical_indicators.rsi.toFixed(1)}</p>
-                        <p><strong>추세:</strong> ${analysis.trend_analysis.trend} (${analysis.trend_analysis.strength})</p>
-                    </div>
-                    
-                    <div class="analysis-item">
-                        <h3>🎯 지지/저항선</h3>
-                        <p><strong>지지선:</strong> ${analysis.support_resistance.support.toLocaleString()}원</p>
-                        <p><strong>저항선:</strong> ${analysis.support_resistance.resistance.toLocaleString()}원</p>
+                    <!-- 기술적 지표 그리드 -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                        <!-- 이동평균선 -->
+                        <div style="background: var(--surface-variant); padding: 16px; border-radius: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                <span class="material-icons" style="color: var(--secondary-color); font-size: 20px;">trending_up</span>
+                                <strong style="font-size: 0.95rem;">이동평균선</strong>
+                            </div>
+                            <div style="display: grid; gap: 8px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--on-surface-variant);">5일:</span>
+                                    <span style="font-weight: 500;">${analysis.moving_averages.ma5.toLocaleString()}원</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--on-surface-variant);">20일:</span>
+                                    <span style="font-weight: 500;">${analysis.moving_averages.ma20.toLocaleString()}원</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--on-surface-variant);">60일:</span>
+                                    <span style="font-weight: 500;">${analysis.moving_averages.ma60.toLocaleString()}원</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 거래량 분석 -->
+                        <div style="background: var(--surface-variant); padding: 16px; border-radius: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                <span class="material-icons" style="color: var(--warning); font-size: 20px;">bar_chart</span>
+                                <strong style="font-size: 0.95rem;">거래량 분석</strong>
+                            </div>
+                            <div style="display: grid; gap: 8px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--on-surface-variant);">현재:</span>
+                                    <span style="font-weight: 500;">${analysis.volume_analysis.current_volume.toLocaleString()}주</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--on-surface-variant);">평균:</span>
+                                    <span style="font-weight: 500;">${analysis.volume_analysis.avg_volume.toLocaleString()}주</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--on-surface-variant);">비율:</span>
+                                    <span style="font-weight: 500; color: ${analysis.volume_analysis.volume_ratio > 1.5 ? 'var(--success)' : analysis.volume_analysis.volume_ratio < 0.5 ? 'var(--error)' : 'var(--on-surface)'};">${analysis.volume_analysis.volume_ratio.toFixed(2)}배</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 기술적 지표 -->
+                        <div style="background: var(--surface-variant); padding: 16px; border-radius: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                <span class="material-icons" style="color: var(--primary-color); font-size: 20px;">analytics</span>
+                                <strong style="font-size: 0.95rem;">기술적 지표</strong>
+                            </div>
+                            <div style="display: grid; gap: 8px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--on-surface-variant);">RSI:</span>
+                                    <span style="font-weight: 500; color: ${analysis.technical_indicators.rsi > 70 ? 'var(--error)' : analysis.technical_indicators.rsi < 30 ? 'var(--success)' : 'var(--on-surface)'};">${analysis.technical_indicators.rsi.toFixed(1)}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--on-surface-variant);">추세:</span>
+                                    <span style="font-weight: 500;">${analysis.trend_analysis.trend}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--on-surface-variant);">강도:</span>
+                                    <span style="font-weight: 500;">${analysis.trend_analysis.strength}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 지지/저항선 -->
+                        <div style="background: var(--surface-variant); padding: 16px; border-radius: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                <span class="material-icons" style="color: var(--secondary-color); font-size: 20px;">support</span>
+                                <strong style="font-size: 0.95rem;">지지/저항선</strong>
+                            </div>
+                            <div style="display: grid; gap: 8px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--on-surface-variant);">지지선:</span>
+                                    <span style="font-weight: 500; color: var(--success);">${analysis.support_resistance.support.toLocaleString()}원</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--on-surface-variant);">저항선:</span>
+                                    <span style="font-weight: 500; color: var(--error);">${analysis.support_resistance.resistance.toLocaleString()}원</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
-            document.getElementById('analysisSection').style.display = 'block';
         }
 
         function displayDetailedPrediction(prediction) {
+            const detailedSection = document.getElementById('detailedPredictionSection');
             const detailedContent = document.getElementById('detailedPredictionContent');
             
             if (!prediction.detailed_reasoning && !prediction.confidence_factors) {
-                document.getElementById('detailedPredictionSection').style.display = 'none';
+                detailedSection.style.display = 'none';
                 return;
             }
+            
+            detailedSection.style.display = 'block';
+            detailedSection.classList.add('fade-in');
             
             detailedContent.innerHTML = `
                 ${prediction.detailed_reasoning ? `
@@ -429,16 +838,19 @@
                     </div>
                 ` : ''}
             `;
-            document.getElementById('detailedPredictionSection').style.display = 'block';
         }
 
         function displayDetailedAnalysis(analysis) {
+            const detailedSection = document.getElementById('detailedAnalysisSection');
             const detailedContent = document.getElementById('detailedAnalysisContent');
             
             if (!analysis.detailed_analysis && !analysis.key_insights) {
-                document.getElementById('detailedAnalysisSection').style.display = 'none';
+                detailedSection.style.display = 'none';
                 return;
             }
+            
+            detailedSection.style.display = 'block';
+            detailedSection.classList.add('fade-in');
             
             const getSentimentClass = (sentiment) => {
                 if (sentiment === '강세') return 'sentiment-bull';
@@ -482,7 +894,6 @@
                     </div>
                 ` : ''}
             `;
-            document.getElementById('detailedAnalysisSection').style.display = 'block';
         }
 
 
@@ -532,6 +943,13 @@
 
                 // AI 분석은 별도로 비동기 로딩
                 if (!skipAnalysis) {
+                    // 인사이트 그리드 표시
+                    setTimeout(() => {
+                        const insightsGrid = document.getElementById('insightsGrid');
+                        insightsGrid.style.display = 'grid';
+                        insightsGrid.classList.add('slide-up');
+                    }, 300);
+                    
                     loadAIAnalysis(stockCode);
                 }
 
