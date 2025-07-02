@@ -13,7 +13,8 @@ from openai import OpenAI
 app = FastAPI(title="Stock Chart API", description="주식 차트 조회 API")
 
 # OpenAI 클라이언트 초기화
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=api_key) if api_key else None
 
 # CORS 설정
 app.add_middleware(
@@ -84,16 +85,24 @@ async def get_ai_analysis_only(stock_code: str):
         basic_analysis = generate_chart_analysis(df)
         
         # OpenAI를 이용한 상세 분석 및 예측
-        try:
-            ai_analysis = await get_ai_analysis(df, stock_code, basic_analysis)
-            ai_prediction = await get_ai_prediction(df, stock_code, basic_analysis)
-            
-            return {
-                'analysis': {**basic_analysis, **ai_analysis},
-                'prediction': ai_prediction
-            }
-        except Exception as e:
-            # AI 분석 실패 시 기본 분석 사용
+        if client:
+            try:
+                ai_analysis = await get_ai_analysis(df, stock_code, basic_analysis)
+                ai_prediction = await get_ai_prediction(df, stock_code, basic_analysis)
+                
+                return {
+                    'analysis': {**basic_analysis, **ai_analysis},
+                    'prediction': ai_prediction
+                }
+            except Exception as e:
+                # AI 분석 실패 시 기본 분석 사용
+                prediction = generate_stock_prediction(df)
+                return {
+                    'analysis': basic_analysis,
+                    'prediction': prediction
+                }
+        else:
+            # OpenAI 클라이언트가 없으면 기본 분석만 사용
             prediction = generate_stock_prediction(df)
             return {
                 'analysis': basic_analysis,
@@ -201,13 +210,24 @@ def generate_stock_prediction(df):
     latest = df.iloc[-1]
     prev_close = float(latest['Close'])
     
-    # 최근 5일 변동성 계산
-    recent_prices = pd.to_numeric(df['Close'].tail(5))
-    volatility = recent_prices.std() / recent_prices.mean()
+    # 최근 10일 변동성 계산 (더 안정적)
+    recent_prices = pd.to_numeric(df['Close'].tail(10))
+    price_returns = recent_prices.pct_change().dropna()
+    volatility = price_returns.std()
+    
+    # 변동성이 너무 작거나 NaN인 경우 기본값 사용
+    if pd.isna(volatility) or volatility < 0.01:
+        volatility = 0.02  # 기본 변동성 2%
+    
+    # 변동성이 너무 큰 경우 제한
+    volatility = min(volatility, 0.1)  # 최대 10% 변동성
     
     # 간단한 예측 로직 (실제로는 더 복잡한 ML 모델 사용)
     # 최근 추세와 변동성을 고려한 예측
-    recent_trend = (recent_prices.iloc[-1] - recent_prices.iloc[0]) / recent_prices.iloc[0]
+    if len(recent_prices) >= 2:
+        recent_trend = (recent_prices.iloc[-1] - recent_prices.iloc[0]) / recent_prices.iloc[0]
+    else:
+        recent_trend = 0
     
     # 예측 확률 (랜덤 요소 포함)
     base_prob = 0.5 + (recent_trend * 0.3)  # 추세 반영
@@ -216,7 +236,7 @@ def generate_stock_prediction(df):
     direction = "상승" if up_probability > 0.5 else "하락"
     confidence = abs(up_probability - 0.5) * 2
     
-    # 예측 가격 범위
+    # 예측 가격 범위 (현재가 기준 퍼센트로 계산)
     price_change_range = prev_close * volatility * random.uniform(0.5, 2.0)
     
     if direction == "상승":
@@ -229,6 +249,16 @@ def generate_stock_prediction(df):
         predicted_close = prev_close - random.uniform(price_change_range*0.2, price_change_range*0.8)
         predicted_high = max(predicted_open, predicted_close) + random.uniform(0, price_change_range*0.2)
         predicted_low = min(predicted_open, predicted_close) - random.uniform(0, price_change_range*0.3)
+    
+    # 가격이 음수가 되지 않도록 보정
+    predicted_open = max(predicted_open, prev_close * 0.1)  # 최소 현재가의 10%
+    predicted_close = max(predicted_close, prev_close * 0.1)
+    predicted_high = max(predicted_high, max(predicted_open, predicted_close))
+    predicted_low = max(predicted_low, prev_close * 0.05)  # 최소 현재가의 5%
+    
+    # 논리적 일관성 확인
+    predicted_high = max(predicted_high, predicted_open, predicted_close)
+    predicted_low = min(predicted_low, predicted_open, predicted_close)
     
     # 거래량 예측
     avg_volume = df['Volume'].tail(10).mean()
@@ -253,6 +283,8 @@ def generate_stock_prediction(df):
 
 async def get_ai_analysis(df, stock_code, basic_analysis):
     """OpenAI를 이용한 상세 주식 분석"""
+    if not client:
+        raise Exception("OpenAI client not available")
     try:
         # 최근 30일 데이터 준비
         recent_data = df.tail(30)
@@ -319,6 +351,8 @@ async def get_ai_analysis(df, stock_code, basic_analysis):
 
 async def get_ai_prediction(df, stock_code, basic_analysis):
     """OpenAI를 이용한 주식 예측"""
+    if not client:
+        raise Exception("OpenAI client not available")
     try:
         now = datetime.now()
         market_close_time = now.replace(hour=15, minute=30, second=0, microsecond=0)
@@ -369,6 +403,35 @@ async def get_ai_prediction(df, stock_code, basic_analysis):
         import json
         ai_prediction = json.loads(response.choices[0].message.content)
         ai_prediction['current_price'] = current_price
+        
+        # AI 예측 가격 검증 및 보정
+        if 'predicted_prices' in ai_prediction:
+            prices = ai_prediction['predicted_prices']
+            
+            # 가격이 현재가 대비 너무 작거나 큰 경우 보정
+            for key in ['open', 'close', 'high', 'low']:
+                if key in prices:
+                    predicted_price = float(prices[key])
+                    
+                    # 현재가의 0.1배보다 작거나 10배보다 큰 경우 보정
+                    if predicted_price < current_price * 0.1:
+                        prices[key] = round(current_price * random.uniform(0.95, 1.05), 0)
+                    elif predicted_price > current_price * 10:
+                        prices[key] = round(current_price * random.uniform(0.95, 1.05), 0)
+                    else:
+                        prices[key] = round(predicted_price, 0)
+            
+            # 논리적 일관성 확인
+            predicted_open = prices.get('open', current_price)
+            predicted_close = prices.get('close', current_price)
+            predicted_high = prices.get('high', current_price)
+            predicted_low = prices.get('low', current_price)
+            
+            # High는 모든 가격보다 높거나 같아야 함
+            prices['high'] = max(predicted_high, predicted_open, predicted_close)
+            # Low는 모든 가격보다 낮거나 같아야 함
+            prices['low'] = min(predicted_low, predicted_open, predicted_close)
+        
         return ai_prediction
         
     except Exception as e:

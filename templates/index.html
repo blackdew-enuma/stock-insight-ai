@@ -897,24 +897,58 @@
         }
 
 
-        async function fetchStockData(period = currentPeriod, skipAnalysis = false) {
-            let stockCode = currentStockCode;
+        function clearPreviousResults() {
+            // 모든 분석 섹션 숨기기
+            document.getElementById('predictionSection').style.display = 'none';
+            document.getElementById('analysisSection').style.display = 'none';
+            document.getElementById('detailedPredictionSection').style.display = 'none';
+            document.getElementById('detailedAnalysisSection').style.display = 'none';
+            document.getElementById('insightsGrid').style.display = 'none';
+            document.getElementById('chartCard').style.display = 'none';
             
-            if (!stockCode) {
+            // 상태 메시지 초기화
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('stockInfo').style.display = 'none';
+            hideAnalyzing();
+            
+            // 캐시 초기화
+            analysisCache = null;
+            fullStockData = null;
+        }
+        
+
+        async function fetchStockData(period = currentPeriod, skipAnalysis = false) {
+            // 기간 변경인지 새로운 조회인지 구분
+            const isPeriodChange = skipAnalysis;
+            let stockCode;
+            
+            if (isPeriodChange) {
+                // 기간 변경인 경우에만 기존 stockCode 사용
+                stockCode = currentStockCode;
+                if (!stockCode) {
+                    showError('먼저 주식을 선택해주세요.');
+                    return;
+                }
+            } else {
+                // 새로운 조회인 경우 항상 입력 필드 값 확인
                 const inputValue = document.getElementById('stockCodeInput').value.trim();
                 if (!inputValue) {
                     showError('주식 코드를 입력해주세요.');
                     return;
                 }
-                
                 stockCode = inputValue;
+                
+                // 새로운 주식 코드인 경우에만 이전 결과 초기화
+                if (currentStockCode !== stockCode) {
+                    clearPreviousResults();
+                }
+                currentStockCode = stockCode;
             }
             
-            currentStockCode = stockCode;
             currentPeriod = period;
 
             // 기간 변경이면 클라이언트 사이드에서 필터링
-            if (skipAnalysis && fullStockData) {
+            if (skipAnalysis && fullStockData && currentStockCode === stockCode) {
                 const filteredData = filterDataByPeriod(fullStockData, period);
                 createCombinedChart(filteredData);
                 return;
@@ -1110,6 +1144,8 @@
                 fetchStockData();
             }
         });
+        
+        // 입력 필드 이벤트 리스너 제거 - 조회 버튼을 누르기 전까지는 기존 결과 유지
 
         // 기간 선택 콤보박스 이벤트
         document.getElementById('periodSelect').addEventListener('change', function() {
@@ -1118,11 +1154,9 @@
                 return;
             }
 
-            // 클라이언트 사이드에서 빠르게 필터링 (분석 재생성 없이)
+            // fetchStockData 함수를 사용하여 일관성 유지 (분석 재생성 없이)
             const period = this.value;
-            currentPeriod = period;
-            const filteredData = filterDataByPeriod(fullStockData, period);
-            createCombinedChart(filteredData);
+            fetchStockData(period, true);  // skipAnalysis = true
         });
     </script>
 </body>
