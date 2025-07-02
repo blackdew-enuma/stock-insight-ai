@@ -357,20 +357,30 @@ async def get_ai_analysis(df, stock_code, basic_analysis):
             'resistance': float(basic_analysis['support_resistance']['resistance'])
         }
         
+        # 통화 쌍인지 주식인지 구분하여 적절한 분석 컨텍스트 제공
+        asset_type = "환율" if "/" in stock_code else "주식"
+        
         prompt = f"""
-        주식 코드 {stock_code}의 기술적 분석을 수행해주세요.
+        {stock_code}의 {asset_type} 기술적 분석을 수행해주세요. 
+        현재 시장 동향과 최신 경제 뉴스를 고려하여 전문적인 분석을 제공해주세요.
         
         현재 데이터:
-        - 현재가: {data_summary['current_price']:,}원
+        - 현재가: {data_summary['current_price']:,}{'원' if asset_type == '주식' else ''}
         - 전일 대비: {data_summary['price_change_pct']:.2f}%
         - RSI: {data_summary['rsi']:.1f}
-        - 5일 이평선: {data_summary['ma5']:,}원
-        - 20일 이평선: {data_summary['ma20']:,}원
+        - 5일 이평선: {data_summary['ma5']:,}
+        - 20일 이평선: {data_summary['ma20']:,}
         - 추세: {data_summary['trend']}
-        - 지지선: {data_summary['support']:,}원
-        - 저항선: {data_summary['resistance']:,}원
+        - 지지선: {data_summary['support']:,}
+        - 저항선: {data_summary['resistance']:,}
         - 최근 10일 종가: {data_summary['recent_prices']}
         - 최근 10일 거래량: {data_summary['recent_volumes']}
+        
+        분석 시 고려사항:
+        - 현재 전 세계 경제 상황과 금융시장 동향
+        - 해당 {asset_type}에 영향을 미치는 주요 경제 지표
+        - 최근 뉴스와 시장 이벤트
+        - 기술적 지표의 신뢰성과 시장 심리
         
         다음 형식으로 JSON 응답해주세요:
         {{
@@ -382,15 +392,80 @@ async def get_ai_analysis(df, stock_code, basic_analysis):
         }}
         """
         
+        # 웹서치 기능을 활용한 실시간 분석
+        analysis_input = f"""
+        {stock_code}의 {asset_type} 기술적 분석을 수행해주세요. 
+        최신 뉴스, 시장 동향, 경제 지표를 웹에서 검색하여 실시간 정보를 반영한 전문적인 분석을 제공해주세요.
+        
+        현재 데이터:
+        - 현재가: {data_summary['current_price']:,}{'원' if asset_type == '주식' else ''}
+        - 전일 대비: {data_summary['price_change_pct']:.2f}%
+        - RSI: {data_summary['rsi']:.1f}
+        - 5일 이평선: {data_summary['ma5']:,}
+        - 20일 이평선: {data_summary['ma20']:,}
+        - 추세: {data_summary['trend']}
+        - 지지선: {data_summary['support']:,}
+        - 저항선: {data_summary['resistance']:,}
+        
+        다음 JSON 형식으로 응답해주세요:
+        {{
+            "market_sentiment": "강세/약세/중립",
+            "key_insights": ["주요 인사이트 1", "주요 인사이트 2", "주요 인사이트 3"],
+            "technical_summary": "기술적 분석 요약 (100자 이내)",
+            "risk_factors": ["리스크 요인 1", "리스크 요인 2"],
+            "detailed_analysis": "상세한 차트 분석 및 해석 (500자 이내)"
+        }}
+        """
+        
+        # 분석 프롬프트 출력
+        print(f"\n🔍 [AI 분석 프롬프트] for {stock_code}")
+        print("=" * 80)
+        print(analysis_input)
+        print("=" * 80)
+        
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            max_tokens=1000
+            model="gpt-4.1",
+            messages=[
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"당신은 경험이 풍부한 {asset_type} 전문 분석가입니다. 현재 시장 상황과 최신 경제 동향을 바탕으로 정확하고 전문적인 분석을 제공해주세요."
+                        }
+                    ]
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": analysis_input
+                        }
+                    ]
+                }
+            ],
+            response_format={
+                "type": "json_object"
+            },
+            temperature=0.7,
+            max_completion_tokens=1000,
+            top_p=1,
+            frequency_penalty=0,
+            presence_penalty=0
         )
         
         import json
-        ai_analysis = json.loads(response.choices[0].message.content)
+        # chat.completions API의 응답 형식에 맞게 수정
+        response_content = response.choices[0].message.content
+        
+        # GPT 응답 출력
+        print(f"\n📊 [AI 분석 응답] for {stock_code}")
+        print("=" * 80)
+        print(response_content)
+        print("=" * 80)
+        
+        ai_analysis = json.loads(response_content)
         return ai_analysis
         
     except Exception as e:
@@ -417,16 +492,27 @@ async def get_ai_prediction(df, stock_code, basic_analysis):
         recent_data = df.tail(20)
         current_price = float(basic_analysis['current_price'])
         
+        asset_type = "환율" if "/" in stock_code else "주식"
+        price_unit = "" if asset_type == "환율" else "원"
+        
         prompt = f"""
-        주식 코드 {stock_code}의 {target_date} 주가를 예측해주세요.
+        {stock_code}의 {target_date} {asset_type} 가격을 예측해주세요.
+        최신 경제 동향, 시장 상황, 정치적 요인들을 종합적으로 고려하여 전문적인 예측을 제공해주세요.
         
         현재 상황:
-        - 현재가: {current_price:,}원
+        - 현재가: {current_price:,}{price_unit}
         - 전일 대비: {basic_analysis['price_change_pct']:.2f}%
         - RSI: {basic_analysis['technical_indicators']['rsi']:.1f}
         - 추세: {basic_analysis['trend_analysis']['trend']}
         - 최근 20일 종가: {recent_data['Close'].tolist()}
         - 최근 20일 거래량: {recent_data['Volume'].tolist()}
+        
+        예측 시 고려사항:
+        - 현재 글로벌 경제 상황과 금융시장 동향
+        - 해당 {asset_type}에 영향을 미치는 주요 뉴스와 이벤트
+        - 기술적 지표와 차트 패턴 분석
+        - 시장 심리와 투자자 동향
+        - 거시경제 지표 및 정책 변화
         
         다음 형식으로 JSON 응답해주세요:
         {{
@@ -447,15 +533,85 @@ async def get_ai_prediction(df, stock_code, basic_analysis):
         }}
         """
         
+        # 웹서치 기능을 활용한 실시간 예측
+        prediction_input = f"""
+        {stock_code}의 {target_date} {asset_type} 가격을 예측해주세요.
+        최신 뉴스, 경제 지표, 시장 동향을 웹에서 검색하여 실시간 정보를 반영한 전문적인 예측을 제공해주세요.
+        
+        현재 상황:
+        - 현재가: {current_price:,}{price_unit}
+        - 전일 대비: {basic_analysis['price_change_pct']:.2f}%
+        - RSI: {basic_analysis['technical_indicators']['rsi']:.1f}
+        - 추세: {basic_analysis['trend_analysis']['trend']}
+        
+        다음 JSON 형식으로 응답해주세요:
+        {{
+            "target_date": "{target_date}",
+            "direction": "상승" 또는 "하락",
+            "probability": 확률 (50.0-95.0 사이의 숫자),
+            "predicted_prices": {{
+                "open": 예상시가,
+                "close": 예상종가,
+                "high": 예상최고가,
+                "low": 예상최저가
+            }},
+            "predicted_volume": 예상거래량,
+            "reasoning": "예측 이유 (200자 이내)",
+            "detailed_reasoning": "상세한 예측 근거 및 시나리오 (500자 이내)",
+            "confidence_factors": ["신뢰도를 높이는 요인1", "요인2"],
+            "risk_warnings": ["주의해야 할 리스크1", "리스크2"]
+        }}
+        """
+        
+        # 예측 프롬프트 출력
+        print(f"\n🎯 [AI 예측 프롬프트] for {stock_code}")
+        print("=" * 80)
+        print(prediction_input)
+        print("=" * 80)
+        
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            max_tokens=1200
+            model="gpt-4.1",
+            messages=[
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"당신은 {asset_type} 예측 전문가입니다. 현재 시장 상황, 경제 지표, 정치적 요인 등을 종합적으로 고려하여 정확한 예측을 제공해주세요."
+                        }
+                    ]
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prediction_input
+                        }
+                    ]
+                }
+            ],
+            response_format={
+                "type": "json_object"
+            },
+            temperature=0.7,
+            max_completion_tokens=1200,
+            top_p=1,
+            frequency_penalty=0,
+            presence_penalty=0
         )
         
         import json
-        ai_prediction = json.loads(response.choices[0].message.content)
+        # chat.completions API의 응답 형식에 맞게 수정
+        response_content = response.choices[0].message.content
+        
+        # GPT 응답 출력
+        print(f"\n🎯 [AI 예측 응답] for {stock_code}")
+        print("=" * 80)
+        print(response_content)
+        print("=" * 80)
+        
+        ai_prediction = json.loads(response_content)
         ai_prediction['current_price'] = current_price
         
         # AI 예측 가격 검증 및 보정
