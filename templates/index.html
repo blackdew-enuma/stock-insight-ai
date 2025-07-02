@@ -488,7 +488,7 @@
                         type="text" 
                         id="stockCodeInput" 
                         class="input-field"
-                        placeholder="주식 코드를 입력하세요 (예: 005930, 000660)"
+                        placeholder="주식 코드를 입력하세요 (예: 005930, AAPL, BTC/KRW, USD/KRW, 금, 원유 등)"
                         autocomplete="off"
                     />
                 </div>
@@ -514,9 +514,9 @@
             <!-- 차트 카드 -->
             <div class="chart-card" id="chartCard" style="display: none;">
                 <div class="chart-header">
-                    <h2 class="chart-title">
-                        <span class="material-icons insight-icon">trending_up</span>
-                        주가 및 거래량 차트
+                    <h2 class="chart-title" id="chartTitle">
+                        <span class="material-icons insight-icon" id="chartIcon">trending_up</span>
+                        <span id="chartTitleText">차트</span>
                     </h2>
                     <div class="period-selector">
                         <label for="periodSelect" style="font-weight: 500; color: var(--on-surface-variant); margin-right: 8px;">기간:</label>
@@ -540,7 +540,7 @@
                 <div id="predictionSection" class="insight-card" style="display: none;">
                     <div class="insight-header">
                         <span class="material-icons insight-icon">psychology</span>
-                        <h3 class="insight-title">AI 주가 예측</h3>
+                        <h3 class="insight-title" id="predictionTitle">AI 예측</h3>
                     </div>
                     <div id="predictionContent"></div>
                 </div>
@@ -611,9 +611,19 @@
 
         function showStockInfo(stockCode) {
             const stockInfoEl = document.getElementById('stockInfo');
-            stockInfoEl.innerHTML = `<span class="material-icons" style="margin-right: 8px;">trending_up</span>${stockCode} 주식 데이터 로드 완료`;
+            const isCurrencyPair = stockCode.includes('/');
+            const dataType = isCurrencyPair ? '환율' : '주식';
+            const icon = isCurrencyPair ? 'currency_exchange' : 'trending_up';
+            
+            stockInfoEl.innerHTML = `<span class="material-icons" style="margin-right: 8px;">${icon}</span>${stockCode} ${dataType} 데이터 로드 완료`;
             stockInfoEl.style.display = 'block';
             stockInfoEl.classList.add('fade-in');
+            
+            // 차트 제목과 아이콘 업데이트
+            const chartIcon = document.getElementById('chartIcon');
+            const chartTitleText = document.getElementById('chartTitleText');
+            chartIcon.textContent = icon;
+            chartTitleText.textContent = `${isCurrencyPair ? '환율' : '주가'} 및 거래량 차트`;
             
             // 차트 카드 표시
             const chartCard = document.getElementById('chartCard');
@@ -624,7 +634,12 @@
         function displayPrediction(prediction) {
             const predictionSection = document.getElementById('predictionSection');
             const predictionContent = document.getElementById('predictionContent');
+            const predictionTitle = document.getElementById('predictionTitle');
             const directionClass = prediction.direction === '상승' ? 'up' : 'down';
+            
+            // 제목 업데이트 (통화 쌍인지 주식인지에 따라)
+            const isCurrencyPair = currentStockCode && currentStockCode.includes('/');
+            predictionTitle.textContent = isCurrencyPair ? 'AI 환율 예측' : 'AI 주가 예측';
             
             predictionSection.style.display = 'block';
             predictionSection.classList.add('fade-in');
@@ -957,8 +972,11 @@
             showLoading();
 
             try {
+                // 통화 쌍의 '/' 문자를 '|'로 대체 (URL 라우팅 문제 해결)
+                const processedStockCode = stockCode.replace(/\//g, '|');
+                
                 // 전체 데이터 가져오기 (AI 분석 제외)
-                const response = await fetch(`/api/stock/${stockCode}`);
+                const response = await fetch(`/api/stock/${processedStockCode}`);
                 const data = await response.json();
 
                 if (!response.ok) {
@@ -1039,7 +1057,9 @@
         async function loadAIAnalysis(stockCode) {
             showAnalyzing();
             try {
-                const response = await fetch(`/api/analysis/${stockCode}`);
+                // 통화 쌍의 '/' 문자를 '|'로 대체
+                const processedStockCode = stockCode.replace(/\//g, '|');
+                const response = await fetch(`/api/analysis/${processedStockCode}`);
                 const data = await response.json();
 
                 if (response.ok) {
@@ -1106,7 +1126,7 @@
                             position: 'left',
                             title: {
                                 display: true,
-                                text: '주가 (원)'
+                                text: data.stock_code.includes('/') ? '환율' : '주가 (원)'
                             },
                             beginAtZero: false
                         },
@@ -1127,7 +1147,7 @@
                     plugins: {
                         title: {
                             display: true,
-                            text: `${data.stock_code} 주가 및 거래량 차트`
+                            text: `${data.stock_code} ${data.stock_code.includes('/') ? '환율' : '주가'} 및 거래량 차트`
                         },
                         legend: {
                             display: true,
@@ -1150,7 +1170,7 @@
         // 기간 선택 콤보박스 이벤트
         document.getElementById('periodSelect').addEventListener('change', function() {
             if (!currentStockCode || !fullStockData) {
-                showError('먼저 주식을 선택해주세요.');
+                showError('먼저 조회를 해주세요.');
                 return;
             }
 

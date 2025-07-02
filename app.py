@@ -30,35 +30,86 @@ async def index():
     return FileResponse('templates/index.html')
 
 
-@app.get("/api/stock/{stock_code}")
+@app.get("/api/stock/{stock_code:path}")
 async def get_stock_data(stock_code: str):
-    """전체 주식 데이터 조회 (AI 분석 제외)"""
+    """전체 주식 데이터 조회 (AI 분석 제외) - 주식 및 통화 쌍 지원"""
     try:
+        # 통화 쌍의 '|'를 '/'로 복원 (프론트엔드에서 URL 라우팅 문제 해결을 위해 대체했음)
+        decoded_stock_code = stock_code.replace('|', '/')
+        
         # 최대 5년 데이터 가져오기
         end_date = datetime.now()
         start_date = end_date - timedelta(days=365*5)
         
-        # FinanceDataReader로 주식 데이터 가져오기
-        df = fdr.DataReader(stock_code, start_date, end_date)
+        # FinanceDataReader로 데이터 가져오기 (주식, 통화 쌍, 암호화폐 모두 지원)
+        try:
+            df = fdr.DataReader(decoded_stock_code, start_date, end_date)
+        except Exception as e:
+            print(f"First attempt failed: {e}")
+            # 실패 시 Yahoo Finance로 재시도
+            try:
+                df = fdr.DataReader(decoded_stock_code, start_date, end_date, source='yahoo')
+            except Exception as e2:
+                print(f"Yahoo attempt also failed: {e2}")
+                raise HTTPException(status_code=404, detail=f"데이터를 찾을 수 없습니다: {decoded_stock_code}. {str(e)}")
         
         if df.empty:
-            raise HTTPException(status_code=404, detail="주식 코드를 찾을 수 없습니다.")
+            raise HTTPException(status_code=404, detail=f"데이터를 찾을 수 없습니다: {decoded_stock_code}")
         
-        # 데이터 정리
+        # 데이터 정리 - 인덱스를 Date 컬럼으로 변환
         df = df.reset_index()
-        df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
         
-        # 전체 주식 데이터 반환
+        # 인덱스가 Date로 이름이 없는 경우 첫 번째 컬럼을 Date로 처리
+        if df.columns[0] != 'Date':
+            df = df.rename(columns={df.columns[0]: 'Date'})
+        
+        # Date 컬럼을 문자열로 변환
+        if 'Date' in df.columns:
+            # 이미 datetime 객체인 경우와 그렇지 않은 경우 모두 처리
+            try:
+                if hasattr(df['Date'].iloc[0], 'strftime'):
+                    df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
+                else:
+                    df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%Y-%m-%d')
+            except Exception as e:
+                print(f"Date conversion error: {e}")
+                # 문자열로 변환 시도
+                df['Date'] = df['Date'].astype(str)
+        
+        # 통화 쌍인지 주식인지 구분
+        is_currency_pair = '/' in decoded_stock_code
+        
+        # NaN, Infinity 값 처리 (JSON 직렬화 에러 방지)
+        df = df.replace([np.inf, -np.inf], np.nan)
+        df = df.fillna(0)
+        
+        # 안전한 숫자 변환 함수
+        def safe_float(x):
+            try:
+                val = float(x)
+                return val if np.isfinite(val) else 0.0
+            except (ValueError, TypeError):
+                return 0.0
+                
+        def safe_int(x):
+            try:
+                val = int(float(x))
+                return val if np.isfinite(val) else 0
+            except (ValueError, TypeError):
+                return 0
+        
+        # 데이터 반환
         stock_data = {
             'dates': df['Date'].tolist(),
             'prices': {
-                'open': df['Open'].tolist(),
-                'high': df['High'].tolist(),
-                'low': df['Low'].tolist(),
-                'close': df['Close'].tolist()
+                'open': [safe_float(x) for x in df['Open']],
+                'high': [safe_float(x) for x in df['High']],
+                'low': [safe_float(x) for x in df['Low']],
+                'close': [safe_float(x) for x in df['Close']]
             },
-            'volume': df['Volume'].tolist(),
-            'stock_code': stock_code
+            'volume': [safe_int(x) for x in df['Volume']] if 'Volume' in df.columns else [0] * len(df),
+            'stock_code': decoded_stock_code,
+            'is_currency_pair': is_currency_pair
         }
         
         return stock_data
@@ -68,18 +119,21 @@ async def get_stock_data(stock_code: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"데이터를 가져오는 중 오류가 발생했습니다: {str(e)}")
 
-@app.get("/api/analysis/{stock_code}")
+@app.get("/api/analysis/{stock_code:path}")
 async def get_ai_analysis_only(stock_code: str):
-    """AI 분석만 별도로 제공하는 엔드포인트"""
+    """AI 분석만 별도로 제공하는 엔드포인트 - 주식 및 통화 쌍 지원"""
     try:
+        # 통화 쌍의 '|'를 '/'로 복원
+        decoded_stock_code = stock_code.replace('|', '/')
+        
         # 최근 1년 데이터로 분석 (AI 분석용)
         end_date = datetime.now()
         start_date = end_date - timedelta(days=365)
         
-        df = fdr.DataReader(stock_code, start_date, end_date)
+        df = fdr.DataReader(decoded_stock_code, start_date, end_date)
         
         if df.empty:
-            raise HTTPException(status_code=404, detail="주식 코드를 찾을 수 없습니다.")
+            raise HTTPException(status_code=404, detail=f"데이터를 찾을 수 없습니다: {decoded_stock_code}")
         
         # 기본 차트 분석
         basic_analysis = generate_chart_analysis(df)
@@ -87,8 +141,8 @@ async def get_ai_analysis_only(stock_code: str):
         # OpenAI를 이용한 상세 분석 및 예측
         if client:
             try:
-                ai_analysis = await get_ai_analysis(df, stock_code, basic_analysis)
-                ai_prediction = await get_ai_prediction(df, stock_code, basic_analysis)
+                ai_analysis = await get_ai_analysis(df, decoded_stock_code, basic_analysis)
+                ai_prediction = await get_ai_prediction(df, decoded_stock_code, basic_analysis)
                 
                 return {
                     'analysis': {**basic_analysis, **ai_analysis},
