@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>주식 차트 조회</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .input-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        input[type="text"] {
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            width: 200px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            margin-top: 30px;
+        }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+        }
+        .chart-title {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+            margin: 20px 0;
+        }
+        .error {
+            color: #d32f2f;
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #ffebee;
+            border-radius: 5px;
+        }
+        .stock-info {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 18px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📈 주식 차트 조회</h1>
+        
+        <div class="input-section">
+            <input type="text" id="stockCode" placeholder="주식 코드 입력 (예: 005930)" />
+            <button onclick="fetchStockData()">조회</button>
+        </div>
+        
+        <div id="stockInfo" class="stock-info" style="display: none;"></div>
+        <div id="loading" class="loading" style="display: none;">데이터를 불러오는 중...</div>
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div class="charts-container">
+            <div class="chart-container">
+                <div class="chart-title">주가 차트</div>
+                <canvas id="priceChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">거래량 차트</div>
+                <canvas id="volumeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let priceChart = null;
+        let volumeChart = null;
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('stockInfo').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('error').textContent = message;
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('stockInfo').style.display = 'none';
+        }
+
+        function showStockInfo(stockCode) {
+            document.getElementById('stockInfo').textContent = `${stockCode} 주식 데이터`;
+            document.getElementById('stockInfo').style.display = 'block';
+        }
+
+        async function fetchStockData() {
+            const stockCode = document.getElementById('stockCode').value.trim();
+            
+            if (!stockCode) {
+                showError('주식 코드를 입력해주세요.');
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const response = await fetch(`/api/stock/${stockCode}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || '데이터를 가져오는데 실패했습니다.');
+                }
+
+                hideLoading();
+                showStockInfo(stockCode);
+                createCharts(data);
+
+            } catch (error) {
+                hideLoading();
+                showError(error.message);
+            }
+        }
+
+        function createCharts(data) {
+            // 기존 차트 제거
+            if (priceChart) priceChart.destroy();
+            if (volumeChart) volumeChart.destroy();
+
+            // 주가 차트
+            const priceCtx = document.getElementById('priceChart').getContext('2d');
+            priceChart = new Chart(priceCtx, {
+                type: 'line',
+                data: {
+                    labels: data.dates,
+                    datasets: [{
+                        label: '종가',
+                        data: data.prices.close,
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        borderWidth: 2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: '가격 (원)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '날짜'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${data.stock_code} 주가 변동`
+                        }
+                    }
+                }
+            });
+
+            // 거래량 차트
+            const volumeCtx = document.getElementById('volumeChart').getContext('2d');
+            volumeChart = new Chart(volumeCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.dates,
+                    datasets: [{
+                        label: '거래량',
+                        data: data.volume,
+                        backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                        borderColor: '#28a745',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '거래량'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '날짜'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${data.stock_code} 거래량`
+                        }
+                    }
+                }
+            });
+        }
+
+        // Enter 키로 조회
+        document.getElementById('stockCode').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                fetchStockData();
+            }
+        });
+    </script>
+</body>
+</html>
