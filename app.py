@@ -7,8 +7,13 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import random
+import os
+from openai import OpenAI
 
 app = FastAPI(title="Stock Chart API", description="주식 차트 조회 API")
+
+# OpenAI 클라이언트 초기화
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # CORS 설정
 app.add_middleware(
@@ -53,13 +58,21 @@ async def get_stock_data(stock_code: str):
             'stock_code': stock_code
         }
         
-        # 차트 분석 추가
-        analysis = generate_chart_analysis(df)
-        stock_data['analysis'] = analysis
+        # 기본 차트 분석
+        basic_analysis = generate_chart_analysis(df)
         
-        # 예측 데이터 추가
-        prediction = generate_stock_prediction(df)
-        stock_data['prediction'] = prediction
+        # OpenAI를 이용한 상세 분석 및 예측
+        try:
+            ai_analysis = await get_ai_analysis(df, stock_code, basic_analysis)
+            ai_prediction = await get_ai_prediction(df, stock_code, basic_analysis)
+            
+            stock_data['analysis'] = {**basic_analysis, **ai_analysis}
+            stock_data['prediction'] = ai_prediction
+        except Exception as e:
+            # AI 분석 실패 시 기본 분석 사용
+            stock_data['analysis'] = basic_analysis
+            prediction = generate_stock_prediction(df)
+            stock_data['prediction'] = prediction
         
         return stock_data
     
@@ -213,6 +226,131 @@ def generate_stock_prediction(df):
     }
     
     return prediction
+
+async def get_ai_analysis(df, stock_code, basic_analysis):
+    """OpenAI를 이용한 상세 주식 분석"""
+    try:
+        # 최근 30일 데이터 준비
+        recent_data = df.tail(30)
+        
+        # 데이터 요약 생성
+        data_summary = {
+            'recent_prices': recent_data['Close'].tolist()[-10:],
+            'recent_volumes': recent_data['Volume'].tolist()[-10:],
+            'current_price': float(basic_analysis['current_price']),
+            'price_change_pct': float(basic_analysis['price_change_pct']),
+            'rsi': float(basic_analysis['technical_indicators']['rsi']),
+            'ma5': float(basic_analysis['moving_averages']['ma5']),
+            'ma20': float(basic_analysis['moving_averages']['ma20']),
+            'trend': basic_analysis['trend_analysis']['trend'],
+            'support': float(basic_analysis['support_resistance']['support']),
+            'resistance': float(basic_analysis['support_resistance']['resistance'])
+        }
+        
+        prompt = f"""
+        주식 코드 {stock_code}의 기술적 분석을 수행해주세요.
+        
+        현재 데이터:
+        - 현재가: {data_summary['current_price']:,}원
+        - 전일 대비: {data_summary['price_change_pct']:.2f}%
+        - RSI: {data_summary['rsi']:.1f}
+        - 5일 이평선: {data_summary['ma5']:,}원
+        - 20일 이평선: {data_summary['ma20']:,}원
+        - 추세: {data_summary['trend']}
+        - 지지선: {data_summary['support']:,}원
+        - 저항선: {data_summary['resistance']:,}원
+        - 최근 10일 종가: {data_summary['recent_prices']}
+        - 최근 10일 거래량: {data_summary['recent_volumes']}
+        
+        다음 형식으로 JSON 응답해주세요:
+        {{
+            "market_sentiment": "강세/약세/중립",
+            "key_insights": ["주요 인사이트 1", "주요 인사이트 2", "주요 인사이트 3"],
+            "technical_summary": "기술적 분석 요약 (100자 이내)",
+            "risk_factors": ["리스크 요인 1", "리스크 요인 2"],
+            "detailed_analysis": "상세한 차트 분석 및 해석 (500자 이내)"
+        }}
+        """
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            max_tokens=1000
+        )
+        
+        import json
+        ai_analysis = json.loads(response.choices[0].message.content)
+        return ai_analysis
+        
+    except Exception as e:
+        print(f"AI 분석 오류: {e}")
+        return {
+            "market_sentiment": "중립",
+            "key_insights": ["AI 분석을 사용할 수 없습니다"],
+            "technical_summary": "기본 기술적 분석만 제공됩니다",
+            "risk_factors": ["AI 분석 오류"],
+            "detailed_analysis": "OpenAI API를 통한 상세 분석을 사용할 수 없습니다"
+        }
+
+async def get_ai_prediction(df, stock_code, basic_analysis):
+    """OpenAI를 이용한 주식 예측"""
+    try:
+        now = datetime.now()
+        market_close_time = now.replace(hour=15, minute=30, second=0, microsecond=0)
+        is_after_close = now > market_close_time
+        target_date = "내일" if is_after_close else "오늘"
+        
+        # 최근 데이터 준비
+        recent_data = df.tail(20)
+        current_price = float(basic_analysis['current_price'])
+        
+        prompt = f"""
+        주식 코드 {stock_code}의 {target_date} 주가를 예측해주세요.
+        
+        현재 상황:
+        - 현재가: {current_price:,}원
+        - 전일 대비: {basic_analysis['price_change_pct']:.2f}%
+        - RSI: {basic_analysis['technical_indicators']['rsi']:.1f}
+        - 추세: {basic_analysis['trend_analysis']['trend']}
+        - 최근 20일 종가: {recent_data['Close'].tolist()}
+        - 최근 20일 거래량: {recent_data['Volume'].tolist()}
+        
+        다음 형식으로 JSON 응답해주세요:
+        {{
+            "target_date": "{target_date}",
+            "direction": "상승" 또는 "하락",
+            "probability": 확률 (50.0-95.0 사이의 숫자),
+            "predicted_prices": {{
+                "open": 예상시가,
+                "close": 예상종가,
+                "high": 예상최고가,
+                "low": 예상최저가
+            }},
+            "predicted_volume": 예상거래량,
+            "reasoning": "예측 이유 (200자 이내)",
+            "detailed_reasoning": "상세한 예측 근거 및 시나리오 (500자 이내)",
+            "confidence_factors": ["신뢰도를 높이는 요인1", "요인2"],
+            "risk_warnings": ["주의해야 할 리스크1", "리스크2"]
+        }}
+        """
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            max_tokens=1200
+        )
+        
+        import json
+        ai_prediction = json.loads(response.choices[0].message.content)
+        ai_prediction['current_price'] = current_price
+        return ai_prediction
+        
+    except Exception as e:
+        print(f"AI 예측 오류: {e}")
+        # 기본 예측으로 fallback
+        return generate_stock_prediction(df)
 
 if __name__ == "__main__":
     import uvicorn

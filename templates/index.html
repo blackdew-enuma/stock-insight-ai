@@ -140,6 +140,54 @@
             color: #333;
             font-size: 16px;
         }
+        .reasoning-box {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #2196f3;
+        }
+        .detailed-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            line-height: 1.6;
+        }
+        .confidence-factors, .risk-warnings {
+            margin: 15px 0;
+        }
+        .confidence-factors ul, .risk-warnings ul {
+            padding-left: 20px;
+        }
+        .confidence-factors li {
+            color: #28a745;
+            margin: 5px 0;
+        }
+        .risk-warnings li {
+            color: #dc3545;
+            margin: 5px 0;
+        }
+        .sentiment-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .sentiment-bull {
+            background: #d4edda;
+            color: #155724;
+        }
+        .sentiment-bear {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .sentiment-neutral {
+            background: #e2e3e5;
+            color: #383d41;
+        }
     </style>
 </head>
 <body>
@@ -173,6 +221,18 @@
         <div id="analysisSection" class="analysis-section" style="display: none;">
             <h2>📊 차트 분석</h2>
             <div id="analysisContent"></div>
+        </div>
+        
+        <!-- 상세 예측 섹션 -->
+        <div id="detailedPredictionSection" class="analysis-section" style="display: none;">
+            <h2>🔮 상세 예측 분석</h2>
+            <div id="detailedPredictionContent"></div>
+        </div>
+        
+        <!-- 상세 분석 섹션 -->
+        <div id="detailedAnalysisSection" class="analysis-section" style="display: none;">
+            <h2>📈 상세 차트 분석</h2>
+            <div id="detailedAnalysisContent"></div>
         </div>
     </div>
 
@@ -234,6 +294,12 @@
                         <div style="font-size: 20px; font-weight: bold;">${prediction.predicted_volume.toLocaleString()}주</div>
                     </div>
                 </div>
+                ${prediction.reasoning ? `
+                    <div class="reasoning-box">
+                        <h4>🎯 예측 이유</h4>
+                        <p>${prediction.reasoning}</p>
+                    </div>
+                ` : ''}
             `;
             document.getElementById('predictionSection').style.display = 'block';
         }
@@ -280,6 +346,96 @@
             document.getElementById('analysisSection').style.display = 'block';
         }
 
+        function displayDetailedPrediction(prediction) {
+            const detailedContent = document.getElementById('detailedPredictionContent');
+            
+            if (!prediction.detailed_reasoning && !prediction.confidence_factors) {
+                document.getElementById('detailedPredictionSection').style.display = 'none';
+                return;
+            }
+            
+            detailedContent.innerHTML = `
+                ${prediction.detailed_reasoning ? `
+                    <div class="detailed-section">
+                        <h3>📋 상세 예측 근거</h3>
+                        <p>${prediction.detailed_reasoning}</p>
+                    </div>
+                ` : ''}
+                
+                ${prediction.confidence_factors ? `
+                    <div class="confidence-factors">
+                        <h3>✅ 신뢰도 요인</h3>
+                        <ul>
+                            ${prediction.confidence_factors.map(factor => `<li>${factor}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+                
+                ${prediction.risk_warnings ? `
+                    <div class="risk-warnings">
+                        <h3>⚠️ 리스크 요인</h3>
+                        <ul>
+                            ${prediction.risk_warnings.map(risk => `<li>${risk}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+            `;
+            document.getElementById('detailedPredictionSection').style.display = 'block';
+        }
+
+        function displayDetailedAnalysis(analysis) {
+            const detailedContent = document.getElementById('detailedAnalysisContent');
+            
+            if (!analysis.detailed_analysis && !analysis.key_insights) {
+                document.getElementById('detailedAnalysisSection').style.display = 'none';
+                return;
+            }
+            
+            const getSentimentClass = (sentiment) => {
+                if (sentiment === '강세') return 'sentiment-bull';
+                if (sentiment === '약세') return 'sentiment-bear';
+                return 'sentiment-neutral';
+            };
+            
+            detailedContent.innerHTML = `
+                ${analysis.market_sentiment ? `
+                    <div class="detailed-section">
+                        <h3>📊 시장 심리</h3>
+                        <span class="sentiment-badge ${getSentimentClass(analysis.market_sentiment)}">
+                            ${analysis.market_sentiment}
+                        </span>
+                        ${analysis.technical_summary ? `<p style="margin-top: 15px;">${analysis.technical_summary}</p>` : ''}
+                    </div>
+                ` : ''}
+                
+                ${analysis.key_insights ? `
+                    <div class="detailed-section">
+                        <h3>💡 주요 인사이트</h3>
+                        <ul>
+                            ${analysis.key_insights.map(insight => `<li>${insight}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+                
+                ${analysis.detailed_analysis ? `
+                    <div class="detailed-section">
+                        <h3>📈 상세 분석</h3>
+                        <p>${analysis.detailed_analysis}</p>
+                    </div>
+                ` : ''}
+                
+                ${analysis.risk_factors ? `
+                    <div class="risk-warnings">
+                        <h3>⚠️ 주의 요인</h3>
+                        <ul>
+                            ${analysis.risk_factors.map(risk => `<li>${risk}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+            `;
+            document.getElementById('detailedAnalysisSection').style.display = 'block';
+        }
+
         async function fetchStockData() {
             const stockCode = document.getElementById('stockCode').value.trim();
             
@@ -303,6 +459,8 @@
                 displayPrediction(data.prediction);
                 createCombinedChart(data);
                 displayAnalysis(data.analysis);
+                displayDetailedPrediction(data.prediction);
+                displayDetailedAnalysis(data.analysis);
 
             } catch (error) {
                 hideLoading();
