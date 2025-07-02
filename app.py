@@ -407,7 +407,7 @@ async def get_ai_analysis(df, stock_code, basic_analysis):
         - 지지선: {data_summary['support']:,}
         - 저항선: {data_summary['resistance']:,}
         
-        다음 JSON 형식으로 응답해주세요:
+        반드시 다음과 같은 올바른 JSON 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요:
         {{
             "market_sentiment": "강세/약세/중립",
             "key_insights": ["주요 인사이트 1", "주요 인사이트 2", "주요 인사이트 3"],
@@ -465,8 +465,14 @@ async def get_ai_analysis(df, stock_code, basic_analysis):
         print(response_content)
         print("=" * 80)
         
-        ai_analysis = json.loads(response_content)
-        return ai_analysis
+        try:
+            ai_analysis = json.loads(response_content)
+            return ai_analysis
+        except json.JSONDecodeError as e:
+            print(f"JSON 파싱 오류: {e}")
+            print("기본 분석으로 fallback")
+            # JSON 파싱 실패 시 기본 분석 반환
+            raise Exception("AI 분석 JSON 파싱 실패")
         
     except Exception as e:
         print(f"AI 분석 오류: {e}")
@@ -544,22 +550,22 @@ async def get_ai_prediction(df, stock_code, basic_analysis):
         - RSI: {basic_analysis['technical_indicators']['rsi']:.1f}
         - 추세: {basic_analysis['trend_analysis']['trend']}
         
-        다음 JSON 형식으로 응답해주세요:
+        반드시 다음과 같은 올바른 JSON 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요:
         {{
             "target_date": "{target_date}",
-            "direction": "상승" 또는 "하락",
-            "probability": 확률 (50.0-95.0 사이의 숫자),
+            "direction": "상승",
+            "probability": 75.5,
             "predicted_prices": {{
-                "open": 예상시가,
-                "close": 예상종가,
-                "high": 예상최고가,
-                "low": 예상최저가
+                "open": 60500,
+                "close": 61000,
+                "high": 61200,
+                "low": 60300
             }},
-            "predicted_volume": 예상거래량,
-            "reasoning": "예측 이유 (200자 이내)",
-            "detailed_reasoning": "상세한 예측 근거 및 시나리오 (500자 이내)",
-            "confidence_factors": ["신뢰도를 높이는 요인1", "요인2"],
-            "risk_warnings": ["주의해야 할 리스크1", "리스크2"]
+            "predicted_volume": 15000000,
+            "reasoning": "예측 이유를 여기에 작성",
+            "detailed_reasoning": "상세한 예측 근거를 여기에 작성",
+            "confidence_factors": ["신뢰도 요인1", "신뢰도 요인2"],
+            "risk_warnings": ["리스크1", "리스크2"]
         }}
         """
         
@@ -611,8 +617,14 @@ async def get_ai_prediction(df, stock_code, basic_analysis):
         print(response_content)
         print("=" * 80)
         
-        ai_prediction = json.loads(response_content)
-        ai_prediction['current_price'] = current_price
+        try:
+            ai_prediction = json.loads(response_content)
+            ai_prediction['current_price'] = current_price
+        except json.JSONDecodeError as e:
+            print(f"JSON 파싱 오류: {e}")
+            print("기본 예측으로 fallback")
+            # JSON 파싱 실패 시 기본 예측으로 fallback
+            raise Exception("AI 예측 JSON 파싱 실패")
         
         # AI 예측 가격 검증 및 보정
         if 'predicted_prices' in ai_prediction:
