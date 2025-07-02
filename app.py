@@ -28,12 +28,14 @@ app.add_middleware(
 async def index():
     return FileResponse('templates/index.html')
 
+
 @app.get("/api/stock/{stock_code}")
 async def get_stock_data(stock_code: str):
+    """전체 주식 데이터 조회 (AI 분석 제외)"""
     try:
-        # 최근 1년 데이터 가져오기
+        # 최대 5년 데이터 가져오기
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=365)
+        start_date = end_date - timedelta(days=365*5)
         
         # FinanceDataReader로 주식 데이터 가져오기
         df = fdr.DataReader(stock_code, start_date, end_date)
@@ -45,7 +47,7 @@ async def get_stock_data(stock_code: str):
         df = df.reset_index()
         df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
         
-        # 기본 주식 데이터
+        # 전체 주식 데이터 반환
         stock_data = {
             'dates': df['Date'].tolist(),
             'prices': {
@@ -58,6 +60,26 @@ async def get_stock_data(stock_code: str):
             'stock_code': stock_code
         }
         
+        return stock_data
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"데이터를 가져오는 중 오류가 발생했습니다: {str(e)}")
+
+@app.get("/api/analysis/{stock_code}")
+async def get_ai_analysis_only(stock_code: str):
+    """AI 분석만 별도로 제공하는 엔드포인트"""
+    try:
+        # 최근 1년 데이터로 분석 (AI 분석용)
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=365)
+        
+        df = fdr.DataReader(stock_code, start_date, end_date)
+        
+        if df.empty:
+            raise HTTPException(status_code=404, detail="주식 코드를 찾을 수 없습니다.")
+        
         # 기본 차트 분석
         basic_analysis = generate_chart_analysis(df)
         
@@ -66,20 +88,22 @@ async def get_stock_data(stock_code: str):
             ai_analysis = await get_ai_analysis(df, stock_code, basic_analysis)
             ai_prediction = await get_ai_prediction(df, stock_code, basic_analysis)
             
-            stock_data['analysis'] = {**basic_analysis, **ai_analysis}
-            stock_data['prediction'] = ai_prediction
+            return {
+                'analysis': {**basic_analysis, **ai_analysis},
+                'prediction': ai_prediction
+            }
         except Exception as e:
             # AI 분석 실패 시 기본 분석 사용
-            stock_data['analysis'] = basic_analysis
             prediction = generate_stock_prediction(df)
-            stock_data['prediction'] = prediction
-        
-        return stock_data
+            return {
+                'analysis': basic_analysis,
+                'prediction': prediction
+            }
     
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"데이터를 가져오는 중 오류가 발생했습니다: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"분석 중 오류가 발생했습니다: {str(e)}")
 
 def generate_chart_analysis(df):
     """차트 분석 결과 생성"""

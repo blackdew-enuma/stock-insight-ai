@@ -188,6 +188,30 @@
             background: #e2e3e5;
             color: #383d41;
         }
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .period-selector {
+            display: flex;
+            gap: 5px;
+        }
+        .period-select {
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            min-width: 100px;
+        }
+        .period-select:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
     </style>
 </head>
 <body>
@@ -195,7 +219,7 @@
         <h1>📈 주식 차트 조회</h1>
         
         <div class="input-section">
-            <input type="text" id="stockCode" placeholder="주식 코드 입력 (예: 005930)" />
+            <input type="text" id="stockCodeInput" placeholder="주식 코드 입력 (예: 005930)" />
             <button onclick="fetchStockData()">조회</button>
         </div>
         
@@ -212,7 +236,18 @@
         <!-- 통합 차트 -->
         <div class="charts-container">
             <div class="chart-container">
-                <div class="chart-title">주가 및 거래량 차트</div>
+                <div class="chart-header">
+                    <div class="chart-title">주가 및 거래량 차트</div>
+                    <div class="period-selector">
+                        <select id="periodSelect" class="period-select">
+                            <option value="1w">1주일</option>
+                            <option value="1m" selected>1개월</option>
+                            <option value="3m">3개월</option>
+                            <option value="1y">1년</option>
+                            <option value="max">전체</option>
+                        </select>
+                    </div>
+                </div>
                 <canvas id="combinedChart"></canvas>
             </div>
         </div>
@@ -238,6 +273,10 @@
 
     <script>
         let combinedChart = null;
+        let currentStockCode = null;
+        let currentPeriod = '1m';
+        let analysisCache = null;
+        let fullStockData = null;  // 전체 데이터 저장
 
         function showLoading() {
             document.getElementById('loading').style.display = 'block';
@@ -436,17 +475,34 @@
             document.getElementById('detailedAnalysisSection').style.display = 'block';
         }
 
-        async function fetchStockData() {
-            const stockCode = document.getElementById('stockCode').value.trim();
+
+        async function fetchStockData(period = currentPeriod, skipAnalysis = false) {
+            let stockCode = currentStockCode;
             
             if (!stockCode) {
-                showError('주식 코드를 입력해주세요.');
+                const inputValue = document.getElementById('stockCodeInput').value.trim();
+                if (!inputValue) {
+                    showError('주식 코드를 입력해주세요.');
+                    return;
+                }
+                
+                stockCode = inputValue;
+            }
+            
+            currentStockCode = stockCode;
+            currentPeriod = period;
+
+            // 기간 변경이면 클라이언트 사이드에서 필터링
+            if (skipAnalysis && fullStockData) {
+                const filteredData = filterDataByPeriod(fullStockData, period);
+                createCombinedChart(filteredData);
                 return;
             }
 
             showLoading();
 
             try {
+                // 전체 데이터 가져오기 (AI 분석 제외)
                 const response = await fetch(`/api/stock/${stockCode}`);
                 const data = await response.json();
 
@@ -454,17 +510,87 @@
                     throw new Error(data.error || '데이터를 가져오는데 실패했습니다.');
                 }
 
+                // 전체 데이터 저장
+                fullStockData = data;
+                
                 hideLoading();
                 showStockInfo(stockCode);
-                displayPrediction(data.prediction);
-                createCombinedChart(data);
-                displayAnalysis(data.analysis);
-                displayDetailedPrediction(data.prediction);
-                displayDetailedAnalysis(data.analysis);
+                
+                // 선택된 기간에 맞춰 필터링한 데이터로 차트 즉시 표시
+                const filteredData = filterDataByPeriod(data, period);
+                createCombinedChart(filteredData);
+
+                // AI 분석은 별도로 비동기 로딩
+                if (!skipAnalysis) {
+                    loadAIAnalysis(stockCode);
+                }
 
             } catch (error) {
                 hideLoading();
                 showError(error.message);
+            }
+        }
+
+        function filterDataByPeriod(data, period) {
+            if (period === 'max') {
+                return data; // 전체 데이터 반환
+            }
+
+            const now = new Date();
+            let startDate;
+            
+            switch(period) {
+                case '1w':
+                    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    break;
+                case '1m':
+                    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    break;
+                case '3m':
+                    startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+                    break;
+                case '1y':
+                    startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+                    break;
+                default:
+                    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            }
+
+            const startDateStr = startDate.toISOString().split('T')[0];
+            
+            const startIndex = data.dates.findIndex(date => date >= startDateStr);
+            const validStartIndex = startIndex === -1 ? 0 : startIndex;
+
+            return {
+                dates: data.dates.slice(validStartIndex),
+                prices: {
+                    open: data.prices.open.slice(validStartIndex),
+                    high: data.prices.high.slice(validStartIndex),
+                    low: data.prices.low.slice(validStartIndex),
+                    close: data.prices.close.slice(validStartIndex)
+                },
+                volume: data.volume.slice(validStartIndex),
+                stock_code: data.stock_code
+            };
+        }
+
+        async function loadAIAnalysis(stockCode) {
+            try {
+                const response = await fetch(`/api/analysis/${stockCode}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    analysisCache = data;
+                    
+                    displayPrediction(data.prediction);
+                    displayAnalysis(data.analysis);
+                    displayDetailedPrediction(data.prediction);
+                    displayDetailedAnalysis(data.analysis);
+                } else {
+                    console.error('AI 분석 로드 실패:', data.error);
+                }
+            } catch (error) {
+                console.error('AI 분석 오류:', error);
             }
         }
 
@@ -548,10 +674,24 @@
         }
 
         // Enter 키로 조회
-        document.getElementById('stockCode').addEventListener('keypress', function(e) {
+        document.getElementById('stockCodeInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 fetchStockData();
             }
+        });
+
+        // 기간 선택 콤보박스 이벤트
+        document.getElementById('periodSelect').addEventListener('change', function() {
+            if (!currentStockCode || !fullStockData) {
+                showError('먼저 주식을 선택해주세요.');
+                return;
+            }
+
+            // 클라이언트 사이드에서 빠르게 필터링 (분석 재생성 없이)
+            const period = this.value;
+            currentPeriod = period;
+            const filteredData = filterDataByPeriod(fullStockData, period);
+            createCombinedChart(filteredData);
         });
     </script>
 </body>
