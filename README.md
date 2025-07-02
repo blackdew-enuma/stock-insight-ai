@@ -64,3 +64,43 @@ uvicorn app:app --reload
 ## API 문서
 
 FastAPI 실행 후 `http://localhost:8000/docs`에서 자동 생성된 API 문서를 확인할 수 있습니다.
+
+## 무료 배포 옵션
+
+### 1. Render (추천)
+1. [Render](https://render.com)에 GitHub 계정으로 로그인
+2. "New Web Service" 클릭
+3. GitHub 저장소 연결
+4. 환경변수에 `OPENAI_API_KEY` 설정
+5. 자동 배포 완료
+
+### 2. Railway
+1. [Railway](https://railway.app)에 GitHub 계정으로 로그인
+2. "Deploy from GitHub repo" 선택
+3. 저장소 선택 후 환경변수 설정
+4. 자동 배포
+
+### 3. Fly.io
+```bash
+# Fly CLI 설치
+curl -L https://fly.io/install.sh | sh
+
+# 앱 생성 및 배포
+fly launch
+fly secrets set OPENAI_API_KEY=your_key_here
+fly deploy
+```
+
+### 4. Vercel (서버리스)
+```bash
+# Vercel CLI 설치
+npm i -g vercel
+
+# 배포
+vercel --prod
+```
+
+## 환경변수 설정
+
+모든 배포 플랫폼에서 다음 환경변수를 설정해야 합니다:
+- `OPENAI_API_KEY`: OpenAI API 키
