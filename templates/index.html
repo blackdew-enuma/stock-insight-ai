@@ -223,14 +223,9 @@
             <button onclick="fetchStockData()">조회</button>
         </div>
         
-        <!-- 예측 섹션 -->
-        <div id="predictionSection" class="prediction-section" style="display: none;">
-            <h2>🔮 주가 예측</h2>
-            <div id="predictionContent"></div>
-        </div>
-        
         <div id="stockInfo" class="stock-info" style="display: none;"></div>
         <div id="loading" class="loading" style="display: none;">데이터를 불러오는 중...</div>
+        <div id="analyzing" class="loading" style="display: none;">📊 AI 분석 중...</div>
         <div id="error" class="error" style="display: none;"></div>
         
         <!-- 통합 차트 -->
@@ -250,6 +245,12 @@
                 </div>
                 <canvas id="combinedChart"></canvas>
             </div>
+        </div>
+        
+        <!-- 예측 섹션 -->
+        <div id="predictionSection" class="prediction-section" style="display: none;">
+            <h2>🔮 주가 예측</h2>
+            <div id="predictionContent"></div>
         </div>
         
         <!-- 분석 섹션 -->
@@ -288,10 +289,19 @@
             document.getElementById('loading').style.display = 'none';
         }
 
+        function showAnalyzing() {
+            document.getElementById('analyzing').style.display = 'block';
+        }
+
+        function hideAnalyzing() {
+            document.getElementById('analyzing').style.display = 'none';
+        }
+
         function showError(message) {
             document.getElementById('error').textContent = message;
             document.getElementById('error').style.display = 'block';
             document.getElementById('stockInfo').style.display = 'none';
+            hideAnalyzing();
         }
 
         function showStockInfo(stockCode) {
@@ -575,6 +585,7 @@
         }
 
         async function loadAIAnalysis(stockCode) {
+            showAnalyzing();
             try {
                 const response = await fetch(`/api/analysis/${stockCode}`);
                 const data = await response.json();
@@ -591,6 +602,8 @@
                 }
             } catch (error) {
                 console.error('AI 분석 오류:', error);
+            } finally {
+                hideAnalyzing();
             }
         }
 
